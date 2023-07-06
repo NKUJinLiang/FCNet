@@ -1,20 +1,26 @@
 import os
-import time
 import torch
-import cv2 as cv
 import numpy as np
 from torch.nn import init
 import torch.backends.cudnn as cudnn
-import torchvision
 import argparse
 from torch.utils.data import DataLoader
-from LaplacianPyramid import Lap_Pyramid
-from torchvision import transforms, utils
-from loaddata import ImageSeqDataset
-from batch_transformers import BatchRandomResolution, BatchToTensor, BatchRGBToYCbCr, YCbCrToRGB, BatchTestResolution
-from Unet import Fusion_Model
-from Loss import Pyramid_Loss, Reconstruction_Loss
-import Myloss
+from models.LaplacianPyramid import Lap_Pyramid
+from torchvision import transforms
+from utils import loaddata
+from models import FCNet
+from utils import Loss
+import random
+
+def seed_torch(seed=1029):
+	random.seed(seed)
+	os.environ['PYTHONHASHSEED'] = str(seed)
+	np.random.seed(seed)
+	torch.manual_seed(seed)
+	torch.cuda.manual_seed(seed)
+	torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+	torch.backends.cudnn.benchmark = False
+	torch.backends.cudnn.deterministic = True
 
 def tensor2img(tensor, out_type=np.uint8, min_max=(0, 1)):
     tensor = tensor.squeeze().float().cpu().clamp_(*min_max)  # clamp
@@ -66,35 +72,29 @@ def train(config):
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
     seed = config.seed
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    # random.seed(seed)
-
-    cudnn.benchmark = True
-
+    seed_torch(seed)
     lamda=4000
-
     #初始化损失函数
-    pyr_loss = Pyramid_Loss().cuda()
-    rec_loss = Reconstruction_Loss().cuda()
-    L_spa = Myloss.L_spa().cuda()
+    pyr_loss = Loss.Pyramid_Loss().cuda()
+    rec_loss = Loss.Reconstruction_Loss().cuda()
+    L_spa = Loss.L_spa().cuda()
 
     #是否载入模型
-    wulalala  = Fusion_Model(num_high=3).cuda()
+    wulalala  = FCNet.FCNet(num_high=3).cuda()
     wulalala.apply(weight_init)
     if config.load_pretrain == True:
         wulalala.load_state_dict(torch.load(config.pretrain_dir))
 
     #数据集处理
     train_transform = transforms.Compose([
-        BatchToTensor(),
+        loaddata.BatchToTensor(),
     ])
 
     # 数据集路径
     #datapath = "./data/"
     # 构建数据集
 
-    train_data = ImageSeqDataset(csv_file=os.path.join(config.datapath, 'train.txt'),
+    train_data = loaddata.ImageSeqDataset(csv_file=os.path.join(config.datapath, 'train.txt'),
                                  Train_img_seq_dir=config.datapath,
                                  Label_img_dir=config.labelpath,
                                  Train_transform=train_transform,

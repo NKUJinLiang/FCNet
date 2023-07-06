@@ -4,6 +4,41 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
+class Reconstruction_Loss(nn.Module):
+    def __init__(self):
+        super(Reconstruction_Loss, self).__init__()
+
+    def forward(self, image, label):
+        loss = torch.mean(torch.sum(torch.abs(image - label), [1, 2, 3]), dim=0)
+        return loss
+
+
+class list_Pyramid_Loss(nn.Module):
+
+    def __init__(self,num_high):
+        super(Pyramid_Loss, self).__init__()
+        self.num_high = num_high
+
+    def forward(self, list1, list2):
+        loss = 0
+        for step in range(self.num_high+1):
+            if step == self.num_high:
+                loss = loss + torch.mean(4*(step+1)*(step+1)*torch.sum(torch.abs(list1[step] - list2[step]), [1, 2, 3]), dim=0)
+                break
+            loss = loss + (step+1)*(step+1)*torch.mean(4 * torch.sum(torch.abs(list1[step] - list2[step]), [1, 2, 3]), dim=0)
+        return loss
+
+class Pyramid_Loss(nn.Module):
+
+    def __init__(self):
+        super(Pyramid_Loss, self).__init__()
+
+    def forward(self, x_1, x_2, x_3, label_1, label_2, label_3):
+        loss1 = torch.mean(4 * torch.sum(torch.abs(x_1 - label_1), [1, 2, 3]), dim=0)
+        loss2 = torch.mean(2 * torch.sum(torch.abs(x_2 - label_2), [1, 2, 3]), dim=0)
+        loss3 = torch.mean(torch.sum(torch.abs(x_3 - label_3), [1, 2, 3]), dim=0)
+        loss = loss1 + loss2 + loss3
+        return loss
 
 class L_color(nn.Module):
 
@@ -24,7 +59,6 @@ class L_color(nn.Module):
 
         return k
 
-			
 class L_spa(nn.Module):
 
     def __init__(self):
@@ -45,8 +79,8 @@ class L_spa(nn.Module):
         org_mean = torch.mean(org,1,keepdim=True)
         enhance_mean = torch.mean(enhance,1,keepdim=True)
 
-        org_pool =  self.pool(org_mean)			
-        enhance_pool = self.pool(enhance_mean)	
+        org_pool =  self.pool(org_mean)
+        enhance_pool = self.pool(enhance_mean)
 
         weight_diff =torch.max(torch.FloatTensor([1]).cuda() + 10000*torch.min(org_pool - torch.FloatTensor([0.3]).cuda(),torch.FloatTensor([0]).cuda()),torch.FloatTensor([0.5]).cuda())
         E_1 = torch.mul(torch.sign(enhance_pool - torch.FloatTensor([0.5]).cuda()) ,enhance_pool-org_pool)
@@ -70,6 +104,7 @@ class L_spa(nn.Module):
         # E = 25*(D_left + D_right + D_up +D_down)
 
         return E
+
 class L_exp(nn.Module):
 
     def __init__(self,patch_size,mean_val):
@@ -85,7 +120,7 @@ class L_exp(nn.Module):
 
         d = torch.mean(torch.pow(mean- torch.FloatTensor([self.mean_val] ).cuda(),2))
         return d
-        
+
 class L_TV(nn.Module):
     def __init__(self,TVLoss_weight=1):
         super(L_TV,self).__init__()
@@ -117,7 +152,7 @@ class Sa_Loss(nn.Module):
         Db = b-mb
         k =torch.pow( torch.pow(Dr,2) + torch.pow(Db,2) + torch.pow(Dg,2),0.5)
         # print(k)
-        
+
 
         k = torch.mean(k)
         return k
@@ -144,7 +179,3 @@ class C_color(nn.Module):
 
         return k
 
-if __name__ == "__main__":
-    x_1 = torch.rand(size=(3, 3, 64, 64))
-    color = L_color()
-    print(color(x_1))

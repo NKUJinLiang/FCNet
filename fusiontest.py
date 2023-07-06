@@ -4,7 +4,7 @@ import argparse
 from tqdm import tqdm
 from PIL import Image
 from pathlib import Path
-from Unet import Fusion_Model
+from models import FCNet
 import torch
 import torchvision.transforms.functional as F
 from torchvision.utils import save_image
@@ -88,7 +88,7 @@ if __name__ == '__main__':
         key_words = ['_0', '_N1', '_N1.5', '_P1', '_P1.5']
         test_suffix = [f'{kw}{args.test_ext}' for kw in key_words]
 
-    model = Fusion_Model(num_high=3).cuda()
+    model = FCNet.FCNet(num_high=3).cuda()
     model.load_state_dict(torch.load(args.checkpoint))
 
     label_paths = Path(args.label_dir).glob('*' + args.label_ext)
